@@ -220,11 +220,15 @@ typedef struct ds1302_struct
   uint8_t WP:1;             // WP = Write Protect
 };
 
+int PWM1 = 10; // pulse 'digital' pin 10
+int PWM2 = 11; // pulse 'digital' pin 11
 
 void setup()
 {
   ds1302_struct rtc;
 
+  pinMode(PWM1, OUTPUT);
+  pinMode(PWM2, OUTPUT);
 
   Serial.begin(9600);
   Serial.println(F("DS1302 Real Time Clock"));
@@ -316,6 +320,16 @@ void loop()
     rtc.Day, \
     2000 + bcd2bin( rtc.Year10, rtc.Year));
   Serial.println( buffer);
+
+  //conv sec[0-60] to value [0-255]
+  int sec_conv = bcd2bin( rtc.Seconds10, rtc.Seconds) * 255 / 60;
+  //conv min[0-60] to PWM [0-255]
+  int min_conv = bcd2bin( rtc.Minutes10, rtc.Minutes) * 255 / 60;
+
+  sprintf(buffer, "Write sec_conv:%d min_conv:%d", sec_conv, min_conv);;
+  Serial.println( buffer);
+  analogWrite(PWM1, sec_conv);  // PWM1
+  analogWrite(PWM1, min_conv);  // PWM2
 
   delay( 5000);
 }
