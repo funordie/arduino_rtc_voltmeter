@@ -326,12 +326,12 @@ void loop()
   //conv min[0-60] to PWM [0-255]
   int min_conv = bcd2bin( rtc.Minutes10, rtc.Minutes) * 255 / 60;
 
-  sprintf(buffer, "Write sec_conv:%d min_conv:%d", sec_conv, min_conv);;
+  sprintf(buffer, "Write sec_conv:%d min_conv:%d", sec_conv, min_conv);
   Serial.println( buffer);
   analogWrite(PWM1, sec_conv);  // PWM1
-  analogWrite(PWM1, min_conv);  // PWM2
+  analogWrite(PWM2, min_conv);  // PWM2
 
-  delay( 5000);
+  delay( 1000);
 }
 
 
