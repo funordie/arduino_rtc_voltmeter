@@ -255,12 +255,12 @@ void setup()
   // Example for april 15, 2013, 10:08, monday is 2nd day of Week.
   // Set your own time and date in these variables.
   seconds    = 0;
-  minutes    = 8;
-  hours      = 23;
+  minutes    = 26;
+  hours      = 11;
   dayofweek  = 3;  // Day of week, any day can be first, counts 1...7
-  dayofmonth = 02; // Day of month, 1...31
-  month      = 12;  // month 1...12
-  year       = 2015;
+  dayofmonth = 14; // Day of month, 1...31
+  month      = 1;  // month 1...12
+  year       = 2016;
 
   // Set a time and date
   // This also clears the CH (Clock Halt) bit,
@@ -277,13 +277,13 @@ void setup()
   rtc.Minutes10  = bin2bcd_h( minutes);
   // To use the 12 hour format,
   // use it like these four lines:
-  //    rtc.h12.Hour   = bin2bcd_l( hours);
-  //    rtc.h12.Hour10 = bin2bcd_h( hours);
-  //    rtc.h12.AM_PM  = 0;     // AM = 0
-  //    rtc.h12.hour_12_24 = 1; // 1 for 24 hour format
-  rtc.h24.Hour   = bin2bcd_l( hours);
-  rtc.h24.Hour10 = bin2bcd_h( hours);
-  rtc.h24.hour_12_24 = 0; // 0 for 24 hour format
+  rtc.h12.Hour   = bin2bcd_l( hours);
+  rtc.h12.Hour10 = bin2bcd_h( hours);
+  rtc.h12.AM_PM  = 1;     // AM = 0
+  rtc.h12.hour_12_24 = 1; // 1 for 24 hour format
+//  rtc.h24.Hour   = bin2bcd_l( hours);
+//  rtc.h24.Hour10 = bin2bcd_h( hours);
+//  rtc.h24.hour_12_24 = 0; // 0 for 24 hour format
   rtc.Date       = bin2bcd_l( dayofmonth);
   rtc.Date10     = bin2bcd_h( dayofmonth);
   rtc.Month      = bin2bcd_l( month);
@@ -298,6 +298,129 @@ void setup()
 #endif
 }
 
+static unsigned char min_array[60] = {
+	/* 0 */  10 ,
+	/* 1 */  0 ,
+	/* 2 */  0 ,
+	/* 3 */  0 ,
+	/* 4 */  0 ,
+	/* 5 */  90 ,
+	/* 6 */  0,
+	/* 7 */  0,
+	/* 8 */  0,
+	/* 9 */  0,
+	/* 10*/  115,
+	/* 11*/  0,
+	/* 12*/  0,
+	/* 13*/  0,
+	/* 14*/  0,
+	/* 15*/  130,
+	/* 16*/  0,
+	/* 17*/  0,
+	/* 18*/  0,
+	/* 19*/  0,
+	/* 20*/  140,
+	/* 21*/  0,
+	/* 22*/  0,
+	/* 23*/  0,
+	/* 24*/  0,
+	/* 25*/  147,
+	/* 26*/  0,
+	/* 27*/  0,
+	/* 28*/  0,
+	/* 29*/  0,
+	/* 30*/  155,
+	/* 31*/  0,
+	/* 32*/  0,
+	/* 33*/  0,
+	/* 34*/  0,
+	/* 35*/  165,
+	/* 36*/  0,
+	/* 37*/  0,
+	/* 38*/  0,
+	/* 39*/  0,
+	/* 40*/  176,
+	/* 41*/  0,
+	/* 42*/  0,
+	/* 43*/  0,
+	/* 44*/  0,
+	/* 45*/  187,
+	/* 46*/  0,
+	/* 47*/  0,
+	/* 48*/  0,
+	/* 49*/  0,
+	/* 50*/  200,
+	/* 51*/  0,
+	/* 52*/  0,
+	/* 53*/  0,
+	/* 54*/  0,
+	/* 55*/  228,
+	/* 56*/  0,
+	/* 57*/  0,
+	/* 58*/  0,
+	/* 59*/  0
+//	/* 60*/  255
+};
+
+static unsigned char hour_array[13] = {
+	/* 0 */ 0,
+	/* 1 */ 55,
+	/* 2 */ 70,
+	/* 3 */ 100,
+	/* 4 */ 115,
+	/* 5 */ 130,
+	/* 6 */ 138,
+	/* 7 */ 148,
+	/* 8 */ 158,
+	/* 9 */ 175,
+	/* 10*/ 185,
+	/* 11*/ 200,
+	/* 12*/ 225,
+};
+
+uint8_t ConvertMinuteToPwd(uint8_t minute) {
+	uint8_t ret = 0;
+	char buffer[80];     // the code uses 70 characters.
+
+	sprintf( buffer, "Input minute:%u\n", minute);
+    Serial.print(buffer);
+
+	if(minute > 59) {
+		sprintf( buffer, "Invalid minute:%u\n", minute);
+	    Serial.print(buffer);
+	    return 0;
+	}
+	//round down input minute
+	while(minute % 5) {
+		minute--;
+	}
+
+    ret = min_array[minute];
+
+	sprintf( buffer, "Minute_PWM:%u\n", ret);
+	Serial.print(buffer);
+	return ret;
+}
+
+uint8_t ConvertHourToPwd(uint8_t hour) {
+	uint8_t ret = 0;
+	char buffer[80];     // the code uses 70 characters.
+
+	sprintf( buffer, "Input hour:%u\n", hour);
+    Serial.print(buffer);
+
+	if(hour > 12) {
+		sprintf( buffer, "Invalid hour:%u\n", hour);
+	    Serial.print(buffer);
+	    return 0;
+	}
+
+    ret = hour_array[hour];
+
+	sprintf( buffer, "Hour_PWM:%u\n", ret);
+	Serial.print(buffer);
+	return ret;
+}
 
 void loop()
 {
@@ -307,12 +430,18 @@ void loop()
   // Read all clock data at once (burst mode).
   DS1302_clock_burst_read( (uint8_t *) &rtc);
 
-  sprintf( buffer, "Time = %02d:%02d:%02d, ", \
-    bcd2bin( rtc.h24.Hour10, rtc.h24.Hour), \
+  sprintf( buffer, "Time = %02d:%02d:%02d ", \
+    bcd2bin( rtc.h12.Hour10, rtc.h12.Hour), \
     bcd2bin( rtc.Minutes10, rtc.Minutes), \
     bcd2bin( rtc.Seconds10, rtc.Seconds));
   Serial.print(buffer);
 
+  if(rtc.h12.AM_PM == 1) {
+	  Serial.print("PM, ");
+  }
+  else {
+	  Serial.print("AM, ");
+  }
   sprintf(buffer, "Date(day of month) = %d, Month = %d, " \
     "Day(day of week) = %d, Year = %d", \
     bcd2bin( rtc.Date10, rtc.Date), \
@@ -321,15 +450,8 @@ void loop()
     2000 + bcd2bin( rtc.Year10, rtc.Year));
   Serial.println( buffer);
 
-  //conv sec[0-60] to value [0-255]
-  int sec_conv = bcd2bin( rtc.Seconds10, rtc.Seconds) * 255 / 60;
-  //conv min[0-60] to PWM [0-255]
-  int min_conv = bcd2bin( rtc.Minutes10, rtc.Minutes) * 255 / 60;
-
-  sprintf(buffer, "Write sec_conv:%d min_conv:%d", sec_conv, min_conv);
-  Serial.println( buffer);
-  analogWrite(PWM1, sec_conv);  // PWM1
-  analogWrite(PWM2, min_conv);  // PWM2
+  analogWrite(PWM1, ConvertMinuteToPwd(bcd2bin( rtc.Minutes10, rtc.Minutes)));     // PWM1
+  analogWrite(PWM2, ConvertHourToPwd(bcd2bin( rtc.h12.Hour10, rtc.h12.Hour)));    // PWM2
 
   delay( 1000);
 }
