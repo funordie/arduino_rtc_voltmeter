@@ -180,7 +180,7 @@
 // the 'clock burst' command.
 // Note that this structure contains an anonymous union.
 // It might cause a problem on other compilers.
-typedef struct ds1302_struct
+typedef struct
 {
   uint8_t Seconds:4;      // low decimal digit 0-9
   uint8_t Seconds10:3;    // high decimal digit 0-5
@@ -218,17 +218,35 @@ typedef struct ds1302_struct
   uint8_t Year10:4;
   uint8_t reserved6:7;
   uint8_t WP:1;             // WP = Write Protect
-};
+}ds1302_struct;
 
 int PWM1 = 10; // pulse 'digital' pin 10
 int PWM2 = 11; // pulse 'digital' pin 11
+#define DEBUG_MODE
+
+#ifdef DEBUG_MODE
+#define PRINT (Serial.println(a))
+#else
+#define PRINT
+#endif
+
+//pinout
+//pin 10: voltmeter PWM1
+//pin 11: voltmeter PWM2
+//pin 06: DS1302 Arduino pin for the Serial Clock
+//pin 07  DS1302 Arduino pin for the Data I/O
+//pin 08  DS1302 Arduino pin for the Chip Enable
 
 void setup()
 {
-  ds1302_struct rtc;
-
   pinMode(PWM1, OUTPUT);
   pinMode(PWM2, OUTPUT);
+
+  pinMode(2, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(2), setHourISRFunc, FALLING);
+
+  pinMode(3, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(3), setMinuteISRFunc, FALLING);
 
   Serial.begin(9600);
   Serial.println(F("DS1302 Real Time Clock"));
@@ -243,59 +261,6 @@ void setup()
 
   // Disable Trickle Charger.
   DS1302_write (DS1302_TRICKLE, 0x00);
-
-// Remove the next define,
-// after the right date and time are set.
-#define SET_DATE_TIME_JUST_ONCE
-#ifdef SET_DATE_TIME_JUST_ONCE
-
-  // Fill these variables with the date and time.
-  int seconds, minutes, hours, dayofweek, dayofmonth, month, year;
-
-  // Example for april 15, 2013, 10:08, monday is 2nd day of Week.
-  // Set your own time and date in these variables.
-  seconds    = 0;
-  minutes    = 26;
-  hours      = 11;
-  dayofweek  = 3;  // Day of week, any day can be first, counts 1...7
-  dayofmonth = 14; // Day of month, 1...31
-  month      = 1;  // month 1...12
-  year       = 2016;
-
-  // Set a time and date
-  // This also clears the CH (Clock Halt) bit,
-  // to start the clock.
-
-  // Fill the structure with zeros to make
-  // any unused bits zero
-  memset ((char *) &rtc, 0, sizeof(rtc));
-
-  rtc.Seconds    = bin2bcd_l( seconds);
-  rtc.Seconds10  = bin2bcd_h( seconds);
-  rtc.CH         = 0;      // 1 for Clock Halt, 0 to run;
-  rtc.Minutes    = bin2bcd_l( minutes);
-  rtc.Minutes10  = bin2bcd_h( minutes);
-  // To use the 12 hour format,
-  // use it like these four lines:
-  rtc.h12.Hour   = bin2bcd_l( hours);
-  rtc.h12.Hour10 = bin2bcd_h( hours);
-  rtc.h12.AM_PM  = 1;     // AM = 0
-  rtc.h12.hour_12_24 = 1; // 1 for 24 hour format
-//  rtc.h24.Hour   = bin2bcd_l( hours);
-//  rtc.h24.Hour10 = bin2bcd_h( hours);
-//  rtc.h24.hour_12_24 = 0; // 0 for 24 hour format
-  rtc.Date       = bin2bcd_l( dayofmonth);
-  rtc.Date10     = bin2bcd_h( dayofmonth);
-  rtc.Month      = bin2bcd_l( month);
-  rtc.Month10    = bin2bcd_h( month);
-  rtc.Day        = dayofweek;
-  rtc.Year       = bin2bcd_l( year - 2000);
-  rtc.Year10     = bin2bcd_h( year - 2000);
-  rtc.WP = 0;
-
-  // Write all clock data at once (burst mode).
-//  DS1302_clock_burst_write( (uint8_t *) &rtc);
-#endif
 }
 
 static unsigned char min_array[60] = {
@@ -382,8 +347,8 @@ uint8_t ConvertMinuteToPwd(uint8_t minute) {
 	uint8_t ret = 0;
 	char buffer[80];     // the code uses 70 characters.
 
-	sprintf( buffer, "Input minute:%u\n", minute);
-    Serial.print(buffer);
+//	sprintf( buffer, "Input minute:%u\n", minute);
+//    Serial.print(buffer);
 
 	if(minute > 59) {
 		sprintf( buffer, "Invalid minute:%u\n", minute);
@@ -397,8 +362,8 @@ uint8_t ConvertMinuteToPwd(uint8_t minute) {
 
     ret = min_array[minute];
 
-	sprintf( buffer, "Minute_PWM:%u\n", ret);
-	Serial.print(buffer);
+//	sprintf( buffer, "Minute_PWM:%u\n", ret);
+//	Serial.print(buffer);
 	return ret;
 }
 
@@ -406,8 +371,8 @@ uint8_t ConvertHourToPwd(uint8_t hour) {
 	uint8_t ret = 0;
 	char buffer[80];     // the code uses 70 characters.
 
-	sprintf( buffer, "Input hour:%u\n", hour);
-    Serial.print(buffer);
+//	sprintf( buffer, "Input hour:%u\n", hour);
+//    Serial.print(buffer);
 
 	if(hour > 12) {
 		sprintf( buffer, "Invalid hour:%u\n", hour);
@@ -417,11 +382,20 @@ uint8_t ConvertHourToPwd(uint8_t hour) {
 
     ret = hour_array[hour];
 
-	sprintf( buffer, "Hour_PWM:%u\n", ret);
-	Serial.print(buffer);
+//	sprintf( buffer, "Hour_PWM:%u\n", ret);
+//	Serial.print(buffer);
 	return ret;
 }
-
+volatile int uHourSetPinState = 0;
+volatile int uMinuteSetPinState = 0;
+void setHourISRFunc() {
+	//if button is pressed, gpio value will be 0
+	uHourSetPinState = !digitalRead(2);
+}
+void setMinuteISRFunc() {
+	//if button is pressed, gpio value will be 0
+	uMinuteSetPinState = !digitalRead(3);
+}
 void loop()
 {
   ds1302_struct rtc;
@@ -430,18 +404,66 @@ void loop()
   // Read all clock data at once (burst mode).
   DS1302_clock_burst_read( (uint8_t *) &rtc);
 
+  //check for new clock setup
+  if(uHourSetPinState) {
+	  uHourSetPinState = 0;
+
+	  //TODO check for new month or year
+	  sprintf( buffer, "Set hour from:%d",bcd2bin( rtc.h12.Hour10, rtc.h12.Hour));
+	  Serial.print(buffer);
+
+	  uint8_t hour = bcd2bin( rtc.h12.Hour10, rtc.h12.Hour);
+	  hour++;
+	  if(hour > 12) hour = 0;
+	  rtc.h12.Hour10 = bin2bcd_h(hour);
+	  rtc.h12.Hour = bin2bcd_l(hour);
+
+	  sprintf( buffer, " to :%d\n",bcd2bin( rtc.h12.Hour10, rtc.h12.Hour));
+	  Serial.print(buffer);
+
+	  DS1302_clock_burst_write( (uint8_t *) &rtc);
+  }
+  else if(uMinuteSetPinState) {
+	  uMinuteSetPinState = 0;
+
+	  //TODO check for new month or year
+	  sprintf( buffer, "Set minute from %d",bcd2bin( rtc.Minutes10, rtc.Minutes));
+	  Serial.print(buffer);
+
+	  uint8_t minute = bcd2bin( rtc.Minutes10, rtc.Minutes);
+	  minute++;
+	  if(minute > 59) minute = 0;
+	  rtc.Minutes10 = bin2bcd_h(minute);
+	  rtc.Minutes = bin2bcd_l(minute);
+
+	  sprintf( buffer, " to %d\n",bcd2bin( rtc.Minutes10, rtc.Minutes));
+	  Serial.print(buffer);
+
+	  DS1302_clock_burst_write( (uint8_t *) &rtc);
+  }
   sprintf( buffer, "Time = %02d:%02d:%02d ", \
     bcd2bin( rtc.h12.Hour10, rtc.h12.Hour), \
     bcd2bin( rtc.Minutes10, rtc.Minutes), \
     bcd2bin( rtc.Seconds10, rtc.Seconds));
   Serial.print(buffer);
 
-  if(rtc.h12.AM_PM == 1) {
-	  Serial.print("PM, ");
+  if(rtc.h12.hour_12_24 == 1) {
+	  if(rtc.h12.AM_PM == 1) {
+		  Serial.print("PM, ");
+	  }
+	  else {
+		  Serial.print("AM, ");
+	  }
+	  Serial.print("format 12H ");
   }
   else {
-	  Serial.print("AM, ");
+	  Serial.print("format 24H ");
+
+	  //if format is 24H set it to 12H
+	  rtc.h12.hour_12_24 = 1;
+	  DS1302_clock_burst_write( (uint8_t *) &rtc);
   }
+
   sprintf(buffer, "Date(day of month) = %d, Month = %d, " \
     "Day(day of week) = %d, Year = %d", \
     bcd2bin( rtc.Date10, rtc.Date), \
